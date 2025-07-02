@@ -27,7 +27,7 @@ class SummaryService:
     def generate(self, file_id: str) -> str:
         # ✅ Redis 캐시에서 먼저 요약 확인
         if (c := self.cache.get_pdf(file_id)):
-            completeness = self.check_sentence_completeness(c)
+            # completeness = self.check_sentence_completeness(c)
             return c
         
         # ✅ 벡터 DB에서 문서 가져오기
@@ -45,7 +45,7 @@ class SummaryService:
         #summary된 텍스트를 한국어로 번역
         # translated_summary = self.translate_summary(summary)
         
-        completeness = self.check_sentence_completeness(summary)
+        # completeness = self.check_sentence_completeness(summary)
         
         # ✅ Redis에 캐시 저장
         self.cache.set_pdf(file_id, summary)
