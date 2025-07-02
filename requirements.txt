@@ -15,3 +15,8 @@ pydantic
 tqdm
 openai
 redis>=5.0.0
+
+# PDF 및 OCR 관련
+PyMuPDF>=1.18.0
+Pillow>=9.0.0
+pytesseract>=0.3.10
