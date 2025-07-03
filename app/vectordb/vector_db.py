@@ -15,7 +15,7 @@ from langchain_openai import OpenAIEmbeddings
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
-CHROMA_HOST = os.getenv("CHROMA_HOST", "chroma")  # 도커 외부 접근 시
+CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")  # 도커 외부 접근 시
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 
 class VectorDB:
