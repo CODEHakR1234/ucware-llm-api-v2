@@ -25,6 +25,9 @@ git clone https://github.com/CODEHakR1234/ucware-llm-api-v1.git
 cd ucware-llm-api-v1
 chmod +x scripts/*.sh
 chmod +x run_all.sh
+
+=> 빠른 시작
+./run_all.sh
 ```
 
 ### ✅ 2. 환경 설정 및 의존성 설치

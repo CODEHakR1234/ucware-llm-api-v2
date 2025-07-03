@@ -11,7 +11,7 @@
 - Ubuntu 20.04+ 또는 호환 리눅스 배포판
 - Python 3.10 이상
 - Redis 서버
-- PDF 및 OCR 처리를 위한 도구들 (poppler, tesseract)
+- PDF 및 OCR 처리를 위한 도구들 (tesseract)
 
 ---
 
@@ -21,11 +21,8 @@
 sudo apt update
 sudo apt install -y \
     redis-server \
-    poppler-utils \
-    tesseract-ocr
 ```
 
-> 위 명령어는 Redis, PDF 파서(poppler), OCR(tesseract)을 포함합니다.
 
 ### 🔍 Redis 상태 확인 및 실행
 ```bash
@@ -51,8 +48,6 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
-
-> `unstructured[pdf]`는 PDF 전처리를 위한 라이브러리입니다.
 
 ---
 
@@ -126,8 +121,6 @@ curl -X POST http://localhost:8000/summary \
 
 ## 📎 참고사항
 
-- `poppler-utils`는 `pdftotext`, `pdftocairo` 등 PDF 파싱에 필요합니다.
-- `tesseract-ocr`는 이미지 기반 PDF의 문자 인식(OCR)에 필요합니다.
 - `redis-server`는 캐시 시스템의 백엔드로 사용됩니다.
 
 ---
