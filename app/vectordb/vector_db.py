@@ -8,7 +8,7 @@ import chromadb
 from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
 # ───────── 설정 상수 ───────────────────────────────
@@ -16,7 +16,7 @@ CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")  # 도커 외부 접근 시
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", "9000"))
 
 class VectorDB:
     def __init__(self) -> None:

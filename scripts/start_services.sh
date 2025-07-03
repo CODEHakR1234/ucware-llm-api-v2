@@ -9,7 +9,9 @@ echo "[2] Redis 연결 확인"
 redis-cli ping || echo "❌ Redis 연결 실패"
 
 echo "[3] Chroma 서버 실행 (포트 9000)"
+#nohup chroma run --path ./chroma_db --host 0.0.0.0 --port 9000 --no-auth --no-telemetry > chroma.log 2>&1 &
 nohup chroma run --path ./chroma_db --host 0.0.0.0 --port 9000 > chroma.log 2>&1 &
+# chroma run --path ./chroma_db --host 0.0.0.0 --port 9000
 
 sleep 2
 echo "[4] Chroma 상태 확인"

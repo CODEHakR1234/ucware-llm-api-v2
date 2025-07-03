@@ -1,3 +1,9 @@
+# main.py
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from app.controller import pdf_summary_controller, chat_summary_controller
 
