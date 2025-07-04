@@ -13,6 +13,9 @@ echo "[3] pip 패키지 설치"
 pip install --upgrade pip
 pip install -r requirements.txt
 
+echo -n "🔑 OpenAI API Key를 입력하세요: "
+read -r OPENAI_API_KEY
+
 echo "[4] .env 파일 생성"
 cat > .env <<EOF
 CHROMA_HOST=localhost
@@ -21,7 +24,7 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
 REDIS_TTL=604800
+OPENAI_API_KEY=$OPENAI_API_KEY
 EOF
 
 echo "[✔] .env 생성 완료"
-

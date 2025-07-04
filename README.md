@@ -25,6 +25,10 @@ git clone https://github.com/CODEHakR1234/ucware-llm-api-v1.git
 cd ucware-llm-api-v1
 chmod +x scripts/*.sh
 chmod +x run_all.sh
+chmod +x setup_env.sh
+
+=>실행 환경 설정
+./setup_env.sh
 
 => 빠른 시작
 ./run_all.sh
@@ -57,7 +61,7 @@ chmod +x run_all.sh
 
 4. **환경변수 파일(.env) 생성**
 
-   * `.env` 파일이 자동 생성되며, Chroma/Redis 관련 설정을 포함합니다.
+   * `.env` 파일이 자동 생성되며, OPENAI API 키/Chroma/Redis 관련 설정을 포함합니다.
 
 ---
 
@@ -88,10 +92,11 @@ chmod +x run_all.sh
 
 ---
 
-### ✅ 4. OpenAI API 키 입력 및 FastAPI 실행
+### ✅ 4. OpenAI API 키 등록 및 FastAPI 실행
 
 OpenAI의 GPT 모델을 호출하기 위해 API 키가 필요합니다.
-이 키를 수동으로 입력한 뒤 FastAPI 서버를 실행하면 `/summary` 및 `/chat-summary` 등의 API가 활성화됩니다.
+이 키를 .env파일로 부터 등록한 뒤 FastAPI 서버를 실행하면 
+`/summary` 및 `/ciat-summary` 등의 API가 활성화됩니다.
 
 #### 📌 실행 명령어
 
