@@ -61,7 +61,7 @@ chmod +x setup_env.sh
 
 4. **환경변수 파일(.env) 생성**
 
-   * `.env` 파일이 자동 생성되며, OPENAI API 키/Chroma/Redis 관련 설정을 포함합니다.
+   * `.env` 파일이 자동 생성되며, 관리자가 선택 가능한 llm 과embedding 모델/OPENAI API 키/Chroma/Redis 관련 설정을 포함합니다.
 
 ---
 
