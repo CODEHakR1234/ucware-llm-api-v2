@@ -1,19 +1,27 @@
+import os
 from langchain.chains.summarize import load_summarize_chain
 from langchain_openai import ChatOpenAI
 from app.vectordb.vector_db import VectorDB
 from app.cache.cache_db import get_cache_db  # ✅ Redis 기반 캐시
 from app.cache.cache_db import RedisCacheDB  # ✅ 명시적으로 타입 지정
 from langchain.prompts import PromptTemplate
+#from langchain.llms import HuggingFaceHub
 
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
+
+def get_llm_instance(temperature: float = 0.5):
+    if LLM_PROVIDER == "hf":
+        #return HuggingFaceHub(repo_id=LLM_MODEL_NAME, model_kwargs={"temperature": temperature})
+        return ChatOpenAI(model_name=LLM_MODEL_NAME, temperature=temperature,
+                          max_tokens=1000, openai_api_base="http://localhost:12000/v1",)
+    else:
+        return ChatOpenAI(model_name=LLM_MODEL_NAME, temperature=temperature, max_tokens=1000)
 
 class SummaryService:
     def __init__(self, vector: VectorDB, cache: RedisCacheDB = get_cache_db()):
         self.vector, self.cache = vector, cache
-        self.llm = ChatOpenAI(
-            model_name="gpt-3.5-turbo",
-            temperature=0.3,
-            max_tokens=1000
-        )
+        self.llm = get_llm_instance()
         self.summary_prompt = PromptTemplate(
             template="다음 문서 내용:\n{text}\n\n질문: 내용을 요약해줘\n답변:",
             input_variables=["text"],
