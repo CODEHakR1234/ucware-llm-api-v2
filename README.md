@@ -18,7 +18,7 @@ LangChain 0.2+ 구조를 따르며, OpenAI GPT, Chroma 벡터 DB, Redis 캐시�
 
 ## 🚀 빠른 시작 (KT Cloud / 리눅스 서버 환경 기준)
 
-### ✅ 1. 프로젝트 클론 및 실행 권한 부여
+### ✅ 0. 프로젝트 클론 및 실행 권한 부여
 
 ```bash
 git clone https://github.com/CODEHakR1234/ucware-llm-api-v1.git
@@ -26,12 +26,36 @@ cd ucware-llm-api-v1
 chmod +x scripts/*.sh
 chmod +x run_all.sh
 chmod +x setup_env.sh
+chmod +x run_vllm.sh
+
+=>(vllm 모델 서버 작동) 
+./run_vllm.sh
 
 =>실행 환경 설정
 ./setup_env.sh
 
 => 빠른 시작
 ./run_all.sh
+```
+## ✅ 1. KT Cloud vLLM 서버 구동
+
+KT Cloud 인스턴스에서 Hugging Face 기반 LLM을 `vLLM` 서버로 구동하여, OpenAI API 호환 인터페이스로 외부 서비스와 연결할 수 있습니다.  
+이 서버는 사용자가 입력한 모델을 자동으로 로딩하며, FastAPI와 같은 애플리케이션은 이를 `http://localhost:12000/v1`으로 호출하여 사용할 수 있습니다.
+
+### 📌 주요 특징
+
+- **vLLM 기반 OpenAI 호환 API 서버** 백그라운드 실행
+- **모델 이름 직접 입력 가능**, 기본값은 `google/gemma-7b-it`
+- **Hugging Face 토큰**은 실행 시 안전하게 입력받음 (입력값 숨김 처리)
+- 실행된 서버는 **포트 12000**에서 대기하며, 로그는 `vllm.log`에 저장됨
+- **모델 로딩 완료까지 자동 대기** (최대 180초까지 포트 오픈 감지)
+
+---
+
+### ▶️ 실행 방법
+
+```bash
+./run_vllm.sh
 ```
 
 ### ✅ 2. 환경 설정 및 의존성 설치

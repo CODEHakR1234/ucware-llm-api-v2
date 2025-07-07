@@ -42,7 +42,7 @@ nohup python3 -m vllm.entrypoints.openai.api_server \
   --port $PORT > vllm.log 2>&1 &
 
 # 7. 실행 확인 (최대 180초 대기)
-MAX_WAIT=180
+MAX_WAIT=300
 WAIT_TIME=0
 
 echo ""
