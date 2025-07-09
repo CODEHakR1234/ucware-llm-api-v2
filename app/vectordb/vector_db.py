@@ -53,12 +53,12 @@ class VectorDB:
             embedding_function=self.embeddings,
         )
 
-    def store(self, text: str, file_id: str) -> None:
+    def store(self, chunks: list[str], file_id: str) -> None:
+        """이미 분할된 청크 리스트를 받아 바로 벡터 저장."""
         with self._lock:
             collection_name = self._get_collection_name(file_id)
             vectorstore = self._get_vectorstore(collection_name)
 
-            chunks = self.text_splitter.split_text(text)
             documents = [
                 Document(
                     page_content=chunk,
@@ -69,11 +69,11 @@ class VectorDB:
 
             vectorstore.add_documents(documents)
 
-    def get_docs(self, file_id: str) -> List[Document]:
+    def get_docs(self, file_id: str, query: str, k: int = 8) -> List[Document]:
         try:
             collection_name = self._get_collection_name(file_id)
             vectorstore = self._get_vectorstore(collection_name)
-            return vectorstore.similarity_search("요약", k=100)
+            return vectorstore.similarity_search(query, k= k)
         except Exception as e:
             print(f"Error retrieving documents: {e}")
             return []

@@ -1,26 +1,34 @@
+# app/controller/pdf_summary_controller.py
 from fastapi import APIRouter, Depends, HTTPException
 from app.model.summary_dto import SummaryRequestDTO
-from app.receiver.pdf_receiver import PDFReceiver
-from app.vectordb.vector_db import get_vector_db
-from app.cache.cache_db import get_cache_db
-from app.service.summary_service import SummaryService
 
-router = APIRouter()
+# 새로 만든 LangGraph 서비스 래퍼
+from app.service.summary_service_graph import (
+    SummaryServiceGraph,
+    get_summary_service_graph,  # FastAPI Depends 용 provider
+)
 
-@router.post("/summary")
+router = APIRouter(prefix="/api")  # 필요에 따라 prefix 조정
+
+@router.post("/summary", summary="PDF 요약 생성")
 async def summarize_pdf(
     req: SummaryRequestDTO,
-    vdb = Depends(get_vector_db),
-    cache = Depends(get_cache_db),
+    service: SummaryServiceGraph = Depends(get_summary_service_graph),
 ):
-    if (c := cache.get_pdf(req.file_id)):
-        return {"file_id": req.file_id, "summary": c, "cached": True}
+    """
+    • file_id : 문서 고유 식별자  
+    • pdf_url : PDF 위치(URL)  
+    • query   : 사용자가 알고 싶은 질문/키워드
+    """
+    try:
+        result = await service.generate(
+            file_id=req.file_id,
+            pdf_url=str(req.pdf_url),
+            query=req.query,
+        )
+    except ValueError as e:
+        # Service 층에서 검증 실패 시 400 에러로 매핑
+        raise HTTPException(status_code=400, detail=str(e))
 
-    text = PDFReceiver().fetch_and_extract_text(req.pdf_url)
-    if not text.strip():
-        raise HTTPException(400, "PDF 텍스트 추출 실패")
-    vdb.store(text, req.file_id)
-    summary = SummaryService(vdb, cache).generate(req.file_id)
-    # cache.clear() # 테스트용으로 잠시 넣어둔 캐시 제거, 나중에 삭제 !!!!
-    return {"file_id": req.file_id, "summary": summary, "cached": False}
+    return result  # {file_id, summary, cached} 형식
 
