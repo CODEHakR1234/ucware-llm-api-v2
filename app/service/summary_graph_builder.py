@@ -46,10 +46,13 @@ class SummaryGraphBuilder:
             if (cached := self.cache.get_pdf(key)):
                 st.summary = cached
                 st.cached = True
-                return "hit", st           # 분기 태그
+                return st           # 분기 태그
             st.cached = False
             st._cache_key = key
-            return "miss", st
+            return st
+
+        def cache_branch(st: SummaryState) -> str:   # <- condition_fn
+            return "hit" if st.cached else "miss"    # ✅ str 반환
 
         # ────────── 1. PDF → 청크 ──────────
         async def load_pdf(st: SummaryState):
@@ -82,25 +85,30 @@ class SummaryGraphBuilder:
             return st
 
         # ── 노드 등록
-        g.add_node("cache", check_cache)
-        g.add_node("load", load_pdf)
-        g.add_node("embed", embed)
-        g.add_node("retrieve", retrieve)
-        g.add_node("summarize", summarize)
-        g.add_node("save", save_cache)
+        cache_key = "cache";     g.add_node(cache_key, check_cache)
+        load_key  = "load";      g.add_node(load_key,  load_pdf)
+        embed_key = "embed";     g.add_node(embed_key, embed)
+        retr_key  = "retrieve";  g.add_node(retr_key,  retrieve)
+        sum_key   = "summarize"; g.add_node(sum_key,   summarize)
+        save_key  = "save";      g.add_node(save_key,  save_cache)
 
-        # ── 흐름 정의
-        g.set_entry_point("cache")
+        # ── 흐름
+        g.set_entry_point(cache_key)
+
+        # ① 분기 : 값은 **문자열 키**
         g.add_conditional_edges(
-            "cache",
-            {"hit": "save", "miss": "load"},
+            cache_key,
+            cache_branch,
+            {"hit": save_key, "miss": load_key},
         )
-        g.add_edge("load", "embed")
-        g.add_edge("embed", "retrieve")
-        g.add_edge("retrieve", "summarize")
-        g.add_edge("summarize", "save")
 
-        g.set_finish_point("save")
+        # ② 직선 플로우
+        g.add_edge(load_key,  embed_key)
+        g.add_edge(embed_key, retr_key)
+        g.add_edge(retr_key,  sum_key)
+        g.add_edge(sum_key,   save_key)
 
+        g.set_finish_point(save_key)
+            
         return g.compile()
 

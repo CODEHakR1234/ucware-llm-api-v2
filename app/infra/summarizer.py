@@ -1,22 +1,28 @@
 # app/infrastructure/summarizer.py
 from typing import List
-from app.domain.interfaces import LlmChainIF, TextChunk
-from app.utils.llm_factory import get_llm_instance
-from langchain.chains.summarize import load_summarize_chain
 from langchain.docstore.document import Document
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+from app.utils.llm_factory import get_llm_instance
+from app.domain.interfaces import LlmChainIF, TextChunk
 
+SUMMARY_PROMPT = PromptTemplate(
+    template=(
+        "다음 글 조각들을 참고하여 **질문에 한국어로 답하세요**.\n"
+        "### 질문: {question}\n"
+        "### 글\n{docs}\n"
+        "### 답변:"
+    ),
+    input_variables=["docs", "question"],
+)
 
-class MapReduceSummarizer(LlmChainIF):
+class StuffSummarizer(LlmChainIF):
     def __init__(self):
-        self.llm = get_llm_instance()
-        self.chain = load_summarize_chain(self.llm, chain_type="map_reduce")
+        llm = get_llm_instance(temperature=0.3)
+        self.chain = LLMChain(llm=llm, prompt=SUMMARY_PROMPT)
 
     async def summarize(self, docs: List[TextChunk], query: str) -> str:
-        prompt = (
-            "다음 문서 조각들을 참고하여 사용자의 질문에 답하십시오.\n"
-            f"## 질문: {query}\n\n"
-            "{text}"
-        )
-        lc_docs = [Document(page_content=t) for t in docs]
-        return self.chain.invoke({"input_documents": lc_docs, "question": query})
+        joined = "\n\n".join(docs)                     # 이미 RAG로 추린 청크 합치기
+        result = await self.chain.apredict(docs=joined, question=query)
+        return result.strip()
 
