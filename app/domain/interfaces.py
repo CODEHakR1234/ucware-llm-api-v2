@@ -19,7 +19,7 @@ class VectorStoreIF(Protocol):
 
 class LlmChainIF(Protocol):
     @abstractmethod
-    async def summarize(self, docs: List[TextChunk], query: str) -> str: ...
+    async def execute(self, docs: List[TextChunk], query: str) -> str: ...
 
 
 class CacheIF(Protocol):

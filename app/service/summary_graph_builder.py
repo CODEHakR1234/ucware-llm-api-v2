@@ -72,8 +72,8 @@ class SummaryGraphBuilder:
             return st
 
         # ────────── 4. 요약 ────────────────
-        async def summarize(st: SummaryState):
-            st.summary = await self.summarizer.summarize(
+        async def execute(st: SummaryState):
+            st.summary = await self.summarizer.execute(
                 st.retrieved, st.query
             )  # type: ignore[arg-type]
             return st
@@ -89,7 +89,7 @@ class SummaryGraphBuilder:
         load_key  = "load";      g.add_node(load_key,  load_pdf)
         embed_key = "embed";     g.add_node(embed_key, embed)
         retr_key  = "retrieve";  g.add_node(retr_key,  retrieve)
-        sum_key   = "summarize"; g.add_node(sum_key,   summarize)
+        exec_key   = "execute"; g.add_node(exec_key,   execute)
         save_key  = "save";      g.add_node(save_key,  save_cache)
 
         # ── 흐름
@@ -105,8 +105,8 @@ class SummaryGraphBuilder:
         # ② 직선 플로우
         g.add_edge(load_key,  embed_key)
         g.add_edge(embed_key, retr_key)
-        g.add_edge(retr_key,  sum_key)
-        g.add_edge(sum_key,   save_key)
+        g.add_edge(retr_key,  exec_key)
+        g.add_edge(exec_key,   save_key)
 
         g.set_finish_point(save_key)
             

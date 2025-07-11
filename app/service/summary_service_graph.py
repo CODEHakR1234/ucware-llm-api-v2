@@ -30,7 +30,7 @@ class SummaryServiceGraph:
         )
         return {
             "file_id": file_id,
-            "summary": result["summary"],
+            "answer": result["summary"],
             "cached": result["cached"],
         }
 
