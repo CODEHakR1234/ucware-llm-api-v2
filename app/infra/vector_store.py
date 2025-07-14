@@ -16,3 +16,7 @@ class VectorStore(VectorStoreIF):
     ) -> List[TextChunk]:
         docs = self.vdb.get_docs(doc_id, query, k)
         return [d.page_content for d in docs]
+
+    async def has_chunks(self, doc_id: str) -> bool:
+        """Return *True* if *doc_id* already has at least one chunk stored."""
+        return self.vdb.has_chunks(doc_id)

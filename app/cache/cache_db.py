@@ -20,6 +20,11 @@ class RedisCacheDB:
     def set_pdf(self, fid: str, s: str):
         self.r.set(f"pdf:{fid}", s, ex=self.ttl)  # TTL 적용
 
+    def exists_pdf(self, fid: str) -> bool:
+        """해당 fid 키가 존재하는지만 확인(값은 내려받지 않음)."""
+        # Redis EXISTS → 0 또는 1 반환
+        return self.r.exists(f"pdf:{fid}") > 0
+    
     def get_chat(self, cid: str) -> Optional[str]:
         return None  # 비활성화
 

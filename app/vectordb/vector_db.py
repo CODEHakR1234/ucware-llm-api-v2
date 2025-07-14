@@ -77,6 +77,33 @@ class VectorDB:
         except Exception as e:
             print(f"Error retrieving documents: {e}")
             return []
+'''
+    def get_all_chunks(self, file_id: str) -> List[Document]:
+        """Return *all* stored chunks for *file_id* as ``Document`` objects."""
+        try:
+            collection_name = self._get_collection_name(file_id)
+            collection = self.client.get_collection(collection_name)
+            data = collection.get()  # returns dict with documents & metadatas
+
+            docs: list[str] = data.get("documents", [])  # raw strings
+            metas: list[dict] = data.get("metadatas", [{}] * len(docs))
+
+            return [
+                Document(page_content=text, metadata=meta)
+                for text, meta in zip(docs, metas)
+            ]
+        except Exception as e:
+            print(f"Error fetching all chunks: {e}")
+            return []
+'''     
+    def has_chunks(self, file_id: str) -> bool:
+        """Quick boolean check: does *file_id* have at least one chunk stored?"""
+        try:
+            collection_name = self._get_collection_name(file_id)
+            collection = self.client.get_collection(collection_name)
+            return collection.count() > 0
+        except Exception:
+            return False
 
     def delete_document(self, file_id: str) -> bool:
         try:
@@ -95,7 +122,6 @@ class VectorDB:
         except Exception as e:
             print(f"Error listing documents: {e}")
             return []
-
 
 @lru_cache(maxsize=1)
 def get_vector_db() -> "VectorDB":

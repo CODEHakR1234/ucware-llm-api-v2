@@ -16,18 +16,26 @@ class VectorStoreIF(Protocol):
 
     @abstractmethod
     async def similarity_search(self, doc_id: str, query: str, k: int = 5) -> List[TextChunk]: ...
+    
+    @abstractmethod
+    async def get_all(self, doc_id: str) -> List[TextChunk]: ... #문서 전체 갖고오기
 
 class LlmChainIF(Protocol):
     @abstractmethod
-    async def execute(self, docs: List[TextChunk], query: str) -> str: ...
+    async def execute(self, prompt: str) -> str: ...
 
+    @abstractmethod
+    async def summarize(self, docs: List[TextChunk]) -> str: ...
 
 class CacheIF(Protocol):
     """요약 결과 캐싱을 위한 최소 계약(Port)"""
 
     @abstractmethod
-    def get_pdf(self, key: str) -> Optional[str]: ...
+    def get_summary(self, key: str) -> Optional[str]: ...
 
     @abstractmethod
-    def set_pdf(self, key: str, summary: str) -> None: ...
+    def set_summary(self, key: str, summary: str) -> None: ...
+
+    @abstractmethod
+    def exists_summary(self, key: str) -> bool: ...
 

@@ -16,14 +16,16 @@ class CacheStore(CacheIF):
         self.cache = get_cache_db()   # RedisCacheDB 인스턴스
 
     # ---- CacheIF 구현 ----
-    def get_pdf(self, key: str) -> Optional[str]:
+    def get_summary(self, key: str) -> Optional[str]:
         return self.cache.get_pdf(key)
 
-    def set_pdf(self, key: str, summary: str) -> None:
+    def set_summary(self, key: str, summary: str) -> None:
         # RedisCacheDB.set_pdf 가 ttl 파라미터를 받아들인다면 전달,
         # 아니라면 기본 TTL 로 저장
         self.cache.set_pdf(key, summary)
 
+    def exists_summary(self, key: str) -> bool:
++        return self.cache.exists_pdf(key)
 # -------------------------------
 # ✅ FastAPI Depends용 provider
 # -------------------------------
