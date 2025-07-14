@@ -15,6 +15,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 # ───────── 설정 상수 ───────────────────────────────
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
+_BATCH_SIZE = 500
 
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")  # 도커 외부 접근 시
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "9000"))
@@ -66,8 +67,13 @@ class VectorDB:
                 )
                 for i, chunk in enumerate(chunks)
             ]
-
-            vectorstore.add_documents(documents)
+            for i in range(0, len(documents), _BATCH_SIZE):
+                batch = documents[i : i + _BATCH_SIZE]
+                try:
+                    vectorstore.add_documents(batch)
+                except Exception as e:
+                    # 로그만 남기고 다음 배치 진행 (옵션)
+                    print(f"[VectorDB.store] batch {i//_BATCH_SIZE} 실패: {e}")
 
     def get_docs(self, file_id: str, query: str, k: int = 8) -> List[Document]:
         try:
@@ -77,7 +83,7 @@ class VectorDB:
         except Exception as e:
             print(f"Error retrieving documents: {e}")
             return []
-'''
+
     def get_all_chunks(self, file_id: str) -> List[Document]:
         """Return *all* stored chunks for *file_id* as ``Document`` objects."""
         try:
@@ -95,7 +101,7 @@ class VectorDB:
         except Exception as e:
             print(f"Error fetching all chunks: {e}")
             return []
-'''     
+
     def has_chunks(self, file_id: str) -> bool:
         """Quick boolean check: does *file_id* have at least one chunk stored?"""
         try:

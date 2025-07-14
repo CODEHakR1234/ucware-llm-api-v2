@@ -25,7 +25,7 @@ class CacheStore(CacheIF):
         self.cache.set_pdf(key, summary)
 
     def exists_summary(self, key: str) -> bool:
-+        return self.cache.exists_pdf(key)
+        return self.cache.exists_pdf(key)
 # -------------------------------
 # ✅ FastAPI Depends용 provider
 # -------------------------------

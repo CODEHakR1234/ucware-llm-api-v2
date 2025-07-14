@@ -26,7 +26,7 @@ from app.utils.llm_factory import get_llm_instance
 from app.domain.interfaces import LlmChainIF, TextChunk
 
 
-class StuffSummarizer(LlmChainIF):
+class LlmEngine(LlmChainIF):
     """Concrete implementation of :class:`LlmChainIF`."""
 
     def __init__(self, *, temperature: float = 0.3):
@@ -59,5 +59,7 @@ class StuffSummarizer(LlmChainIF):
         lc_docs = [Document(page_content=t) for t in docs]
         # ``ainvoke`` returns the final summary string when
         # ``return_intermediate_steps=False``.
-        return (await self._summ_chain.ainvoke({"input_documents": lc_docs})).strip()
+        result = await self._summ_chain.ainvoke({"input_documents": lc_docs})
+
+        return str(result["output_text"]).strip()
 

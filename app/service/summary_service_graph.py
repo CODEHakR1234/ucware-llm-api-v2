@@ -1,7 +1,7 @@
 # app/service/summary_service_graph.py
 from app.infra.pdf_loader import PdfLoader
 from app.infra.vector_store import VectorStore
-from app.infra.summarizer import StuffSummarizer
+from app.infra.llm_engine import LlmEngine
 from app.infra.cache_store import CacheStore          
 from app.domain.interfaces import CacheIF
 from .summary_graph_builder import SummaryGraphBuilder, SummaryState
@@ -12,7 +12,7 @@ from .summary_graph_builder import SummaryGraphBuilder, SummaryState
 _builder_singleton = SummaryGraphBuilder(
     PdfLoader(),
     VectorStore(),
-    StuffSummarizer(),
+    LlmEngine(),
     CacheStore(),
 )
 _compiled_graph = _builder_singleton.build()
@@ -24,15 +24,30 @@ class SummaryServiceGraph:
     def __init__(self):
         self.graph = _compiled_graph   # compiled graph shared
 
+    # ------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------
     async def generate(self, file_id: str, pdf_url: str, query: str):
+        """Run the graph and return a dict tailored to the caller."""
         result = await self.graph.ainvoke(
             SummaryState(file_id=file_id, url=pdf_url, query=query)
         )
-        return {
+
+        body = {
             "file_id": file_id,
-            "answer": result["summary"],
-            "cached": result["cached"],
+            "cached": result.get("cached", False),
         }
+        if result.get("error"):
+            body["error"] = result["error"]
+            return body
+
+        # `is_summary` is set by the EntryRouter in the graph
+        if result.get("is_summary"):
+            body["summary"] = result.get("summary")
+        else:
+            body["answer"] = result.get("answer")
+
+        return body
 
 
 # ---- FastAPI DI provider ----
