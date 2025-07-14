@@ -14,6 +14,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from datetime import datetime
 
+from zoneinfo import ZoneInfo
 # ───────── 설정 상수 ───────────────────────────────
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
@@ -71,11 +72,16 @@ class VectorDB:
                 collection_name = self._get_collection_name(file_id)
                 vectorstore = self._get_vectorstore(collection_name)
 
-                
+                now = datetime.now(ZoneInfo("Asia/Seoul"))
+                today = now.strftime('%Y-%m-%d')
+
                 documents = [
                     Document(
                         page_content=chunk,
-                        metadata={"file_id": file_id, "chunk_index": i}
+                        metadata={"file_id": file_id, 
+                        "chunk_index": i,
+                        "date": today
+                        }
                     )
                     for i, chunk in enumerate(chunks)
                 ]
@@ -130,7 +136,7 @@ class VectorDB:
         return deleted
 
     def log_vector_deletion(self, file_id: str):
-        now = datetime.now()
+        now = datetime.now(ZoneInfo("Asia/Seoul"))
         date_key = f"vector:deleted:{now.strftime('%Y-%m-%d')}"
         self.r = get_cache_db().r
         self.r.rpush(date_key, f"{file_id}|{now.isoformat()}")
@@ -152,6 +158,47 @@ class VectorDB:
                 self.log_vector_deletion(fid)
                 deleted_count += 1
         return deleted_count
+
+    def get_vectors_by_date(self, date_str: str) -> List[str]:
+        matched_ids = set()
+        try:
+            vector_ids = self.list_stored_documents()
+            for fid in vector_ids:
+                try:
+                    vectorstore = self._get_vectorstore(fid)
+                    docs = vectorstore.similarity_search("dummy", k=1)  # 일부만 불러도 메타데이터 확인 가능
+                    for doc in docs:
+                        if doc.metadata.get("date") == date_str:
+                            matched_ids.add(fid)
+                            break
+                except Exception as e:
+                    print(f"[get_vectors_by_date] ⚠️ {fid} 처리 중 오류: {e}")
+        except Exception as e:
+            print(f"[get_vectors_by_date] ❌ 전체 조회 실패: {e}")
+        return list(matched_ids)
+
+    def get_memory_estimate(self) -> dict:
+        try:
+            base_path = os.getenv("CHROMA_DB_IMPL", "/chroma")  # 실제 경로로 변경
+            size_bytes = self._get_directory_size(base_path)
+            return {
+                "base_path": base_path,
+                "disk_usage_bytes": size_bytes,
+                "disk_usage_mb": round(size_bytes / (1024 * 1024), 2)
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+
+    def _get_directory_size(self, path: str) -> int:
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if os.path.isfile(fp):
+                    total_size += os.path.getsize(fp)
+        return total_size
+
 
 @lru_cache(maxsize=1)
 def get_vector_db() -> "VectorDB":

@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 import json
+from zoneinfo import ZoneInfo
 
 class RedisCacheDB:
     def __init__(
@@ -20,7 +21,7 @@ class RedisCacheDB:
     def _get_date_key(self, date: datetime = None) -> str:
         """날짜를 기준으로 HSET key 생성"""
         if date is None:
-            date = datetime.now()
+            date = datetime.now(ZoneInfo("Asia/Seoul"))
         return f"pdf:summaries:{date.strftime('%Y-%m-%d')}"
     
     def _get_metadata_key(self, file_id: str) -> str:
@@ -43,7 +44,7 @@ class RedisCacheDB:
         
         # 2. 메타데이터가 없으면 최근 7일간의 모든 날짜 검색
         for i in range(self.ttl_days):
-            date = datetime.now() - timedelta(days=i)
+            date = datetime.now(ZoneInfo("Asia/Seoul")) - timedelta(days=i)
             date_key = self._get_date_key(date)
             summary = self.r.hget(date_key, fid)
             if summary:
@@ -53,7 +54,7 @@ class RedisCacheDB:
 
     def set_pdf(self, fid: str, s: str):
         """날짜별 HSET에 요약본 저장"""
-        now = datetime.now()
+        now = datetime.now(ZoneInfo("Asia/Seoul"))
         date_key = self._get_date_key(now)
         
         # 1. HSET에 요약본 저장
@@ -97,7 +98,7 @@ class RedisCacheDB:
         else:
         # 메타데이터가 없으면 최근 날짜 중 찾아서 삭제
             for i in range(self.ttl_days):
-                date = datetime.now() - timedelta(days=i)
+                date = datetime.now(ZoneInfo("Asia/Seoul")) - timedelta(days=i)
                 date_key = self._get_date_key(date)
                 if self.r.hexists(date_key, fid):
                     deleted = bool(self.r.hdel(date_key, fid))
@@ -121,7 +122,7 @@ class RedisCacheDB:
 
     def cleanup_expired_summaries(self):
         """수동으로 만료된 요약본 정리 (백업용)"""
-        cutoff_date = datetime.now() - timedelta(days=self.ttl_days)
+        cutoff_date = datetime.now(ZoneInfo("Asia/Seoul")) - timedelta(days=self.ttl_days)
         
         # TTL이 지난 날짜의 key들 삭제
         for i in range(30):  # 최대 30일 전까지 확인
@@ -137,7 +138,8 @@ class RedisCacheDB:
         stats = {
             'total_summaries': 0,
             'summaries_by_date': {},
-            'memory_usage': {}
+            'memory_usage': {},
+            'total_memory_bytes': 0
         }
         
         # 날짜별 요약본 개수 집계
@@ -152,7 +154,12 @@ class RedisCacheDB:
             memory_info = self.r.memory_usage(key)
             if memory_info:
                 stats['memory_usage'][date_str] = memory_info
-        
+                stats['total_memory_bytes'] += memory_info
+        for key in self.r.scan_iter(match="pdf:metadata:*"):
+            mem = self.r.memory_usage(key)
+            if mem:
+                stats['total_memory_bytes'] += mem
+                stats['memory_usage'][key] = mem
         return stats
 
     # 기존 메서드는 비활성화 유지
@@ -163,7 +170,7 @@ class RedisCacheDB:
         pass
 
     def _log_cache_deletion(self, file_id: str):
-        now = datetime.now()
+        now = datetime.now(ZoneInfo("Asia/Seoul"))
         date_str = now.strftime('%Y-%m-%d')
         date_key = f"cache:deleted:{date_str}"
         entry = f"{file_id}|{now.isoformat()}"

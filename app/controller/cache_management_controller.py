@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from datetime import datetime, timedelta
 from app.cache.cache_db import get_cache_db
 from fastapi import Query
+import json
 
 router = APIRouter(prefix="/cache", tags=["cache-management"])
 
@@ -98,4 +99,13 @@ async def delete_cache_log(
     return {
         "date": date,
         "deleted": bool(deleted)
+    }
+
+@router.get("/check/{file_id}")
+async def check_cache_existence(file_id: str):
+    cache = get_cache_db()
+    summary = cache.get_pdf(file_id)
+    return {
+        "file_id": file_id,
+        "exists": summary is not None
     }

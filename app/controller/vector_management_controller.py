@@ -6,26 +6,16 @@ from app.cache.cache_db import get_cache_db
 
 router = APIRouter(prefix="/vector", tags=["vector-management"])
 
-@router.get("/list")
-@router.get("/list")
-async def list_documents():
-    vdb = get_vector_db()
-    if vdb is None:
-        return {"error": "VectorDB 조회 중 오류: Chroma 연결 실패"}
-    
-    try:
-        docs = vdb.list_stored_documents()
-        return {"count": len(docs), "file_ids": docs}
-    except Exception as e:
-        return {"error": f"VectorDB 조회 중 오류: {e}"}
-
 @router.get("/statistics")
 async def vector_statistics(vdb: VectorDB = Depends(get_vector_db)):
-    file_ids = vdb.list_stored_documents()
-    return {
-        "total_collections": len(file_ids),
-        "file_ids": file_ids
-    }
+    try:
+        file_ids = vdb.list_stored_documents()
+        return {
+            "count": len(file_ids),
+            "file_ids": file_ids
+        }
+    except Exception as e:
+        return {"error": f"VectorDB 조회 중 오류: {e}"}
 
 @router.get("/check/{file_id}")
 async def check_vector_exists(file_id: str, vdb: VectorDB = Depends(get_vector_db)):
@@ -99,3 +89,16 @@ async def delete_vector_log(
         "date": date,
         "deleted": bool(deleted)
     }
+
+@router.get("/by-date")
+async def get_vectors_by_date(date: str = Query(..., description="YYYY-MM-DD")):
+    vdb = get_vector_db()
+    try:
+        file_ids = vdb.get_vectors_by_date(date)
+        return {
+            "date": date,
+            "count": len(file_ids),
+            "file_ids": file_ids
+        }
+    except Exception as e:
+        return {"error": f"벡터 날짜별 조회 중 오류: {e}"}
