@@ -1,26 +1,27 @@
-
 # app/vectordb/vector_db.py
+
 import os
 import threading
 from functools import lru_cache
 from typing import List
 
 import chromadb
-from app.cache.cache_db import get_cache_db
 from chromadb.config import Settings
+from app.cache.cache_db import get_cache_db
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # ───────── 설정 상수 ───────────────────────────────
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
-CHROMA_HOST = os.getenv("CHROMA_HOST", "chroma")  # 도커 외부 접근 시
+CHROMA_HOST = os.getenv("CHROMA_HOST", "chroma")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 
+print(f"[DEBUG] CHROMA_HOST={CHROMA_HOST}, CHROMA_PORT={CHROMA_PORT}")
 class VectorDB:
     def __init__(self) -> None:
         self.embeddings = OpenAIEmbeddings()
@@ -30,13 +31,26 @@ class VectorDB:
             length_function=len,
         )
         self._lock = threading.RLock()
+        self._client = None  # Lazy 초기화
 
-        self.client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+    @property
+    def client(self):
+        if self._client is None:
+            try:
+                print(f"[VectorDB] Connecting to Chroma at {CHROMA_HOST}:{CHROMA_PORT}")
+                self._client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+                print("[VectorDB] ✅ Chroma connection successful")
+            except Exception as e:
+                print(f"[VectorDB.client] ❌ Chroma 연결 실패: {e}")
+                self._client = None
+        return self._client
 
     def _get_collection_name(self, file_id: str) -> str:
         return file_id
 
     def _get_vectorstore(self, collection_name: str) -> Chroma:
+        if self.client is None:
+            raise RuntimeError("Chroma 클라이언트가 연결되지 않았습니다.")
         return Chroma(
             client=self.client,
             collection_name=collection_name,
@@ -44,47 +58,62 @@ class VectorDB:
         )
 
     def store(self, text: str, file_id: str) -> None:
-        with self._lock:
-            collection_name = self._get_collection_name(file_id)
-            vectorstore = self._get_vectorstore(collection_name)
+        try:
+            with self._lock:
+                print(f"[DEBUG] 📄 원본 텍스트 길이: {len(text)}")
+                chunks = self.text_splitter.split_text(text)
+                print(f"[DEBUG] 🔪 생성된 chunk 수: {len(chunks)}")
 
-            chunks = self.text_splitter.split_text(text)
-            documents = [
-                Document(
-                    page_content=chunk,
-                    metadata={"file_id": file_id, "chunk_index": i}
-                )
-                for i, chunk in enumerate(chunks)
-            ]
+                if not chunks:
+                    print(f"[⚠️] No chunks generated for file_id={file_id}, skipping store.")
+                    return
 
-            vectorstore.add_documents(documents)
+                collection_name = self._get_collection_name(file_id)
+                vectorstore = self._get_vectorstore(collection_name)
+
+                
+                documents = [
+                    Document(
+                        page_content=chunk,
+                        metadata={"file_id": file_id, "chunk_index": i}
+                    )
+                    for i, chunk in enumerate(chunks)
+                ]
+
+                vectorstore.add_documents(documents)
+                print(f"[✅] {len(documents)}개 문서가 vectorstore에 저장됨.")
+        except Exception as e:
+            print(f"[store] ❌ 벡터 저장 실패: {e}")
 
     def get_docs(self, file_id: str, k: int = 30) -> List[Document]:
         try:
             collection_name = self._get_collection_name(file_id)
             vectorstore = self._get_vectorstore(collection_name)
-            return vectorstore.similarity_search("summary", k=k)  # 빈 query 대신 dummy query
+            return vectorstore.similarity_search("summary", k=k)
         except Exception as e:
-            print(f"Error retrieving documents: {e}")
+            print(f"[get_docs] ❌ 유사 문서 검색 실패: {e}")
             return []
-
 
     def delete_document(self, file_id: str) -> bool:
         try:
             with self._lock:
                 collection_name = self._get_collection_name(file_id)
-                self.client.delete_collection(collection_name)
+                if self.client:
+                    self.client.delete_collection(collection_name)
             return True
         except Exception as e:
-            print(f"Error deleting document: {e}")
+            print(f"[delete_document] ❌ 문서 삭제 실패: {e}")
             return False
 
     def list_stored_documents(self) -> List[str]:
         try:
-            collections = self.client.list_collections()
-            return [col.name for col in collections]
+            if self.client:
+                collections = self.client.list_collections()
+                return [col.name for col in collections]
+            else:
+                return []
         except Exception as e:
-            print(f"Error listing documents: {e}")
+            print(f"[list_stored_documents] ❌ 문서 목록 조회 실패: {e}")
             return []
 
     def cleanup_unused_vectors(self, cache) -> List[str]:
@@ -97,15 +126,38 @@ class VectorDB:
                     self.log_vector_deletion(fid)
                     deleted.append(fid)
         except Exception as e:
-            print(f"[VectorDB Cleanup] Error: {e}")
+            print(f"[VectorDB.cleanup_unused_vectors] ❌ 에러: {e}")
         return deleted
 
     def log_vector_deletion(self, file_id: str):
         now = datetime.now()
         date_key = f"vector:deleted:{now.strftime('%Y-%m-%d')}"
-        self.r = get_cache_db().r  # Redis 인스턴스 (불러오거나 주입 가능)
+        self.r = get_cache_db().r
         self.r.rpush(date_key, f"{file_id}|{now.isoformat()}")
+
+    def is_chroma_alive(self) -> bool:
+        try:
+            if self.client:
+                self.client.heartbeat()
+                return True
+        except:
+            return False
+        return False
+    
+    def delete_all_vectors(self) -> int:
+        file_ids = self.list_stored_documents()
+        deleted_count = 0
+        for fid in file_ids:
+            if self.delete_document(fid):
+                self.log_vector_deletion(fid)
+                deleted_count += 1
+        return deleted_count
+
 @lru_cache(maxsize=1)
 def get_vector_db() -> "VectorDB":
-    return VectorDB()
+    try:
+        return VectorDB()
+    except Exception as e:
+        print(f"[get_vector_db] ❌ VectorDB 초기화 실패: {e}")
+        return None
 

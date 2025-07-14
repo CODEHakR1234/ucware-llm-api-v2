@@ -85,21 +85,29 @@ class RedisCacheDB:
         return self.r.hlen(date_key)
 
     def delete_pdf(self, fid: str) -> bool:
-        """특정 PDF 요약본 삭제"""
-        # 메타데이터에서 날짜 확인
-        metadata = self.r.get(self._get_metadata_key(fid))
+        metadata_key = self._get_metadata_key(fid)
+        metadata = self.r.get(metadata_key)
+        deleted = False
+
         if metadata:
             meta = json.loads(metadata)
             date_key = f"pdf:summaries:{meta['date']}"
-            
-            # HSET에서 삭제
-            result = self.r.hdel(date_key, fid)
-            
-            # 메타데이터 삭제
-            self.r.delete(self._get_metadata_key(fid))
-            
-            return bool(result)
-        return False
+            deleted = bool(self.r.hdel(date_key, fid))
+            self.r.delete(metadata_key)
+        else:
+        # 메타데이터가 없으면 최근 날짜 중 찾아서 삭제
+            for i in range(self.ttl_days):
+                date = datetime.now() - timedelta(days=i)
+                date_key = self._get_date_key(date)
+                if self.r.hexists(date_key, fid):
+                    deleted = bool(self.r.hdel(date_key, fid))
+                    break
+
+    # ✅ 삭제 성공했으면 무조건 로그 남기기
+        if deleted:
+            self._log_cache_deletion(fid)
+
+        return deleted
 
     def get_all_file_ids(self) -> List[str]:
         """현재 저장된 모든 file_id 조회"""
@@ -153,6 +161,29 @@ class RedisCacheDB:
 
     def set_chat(self, cid, s: str):
         pass
+
+    def _log_cache_deletion(self, file_id: str):
+        now = datetime.now()
+        date_str = now.strftime('%Y-%m-%d')
+        date_key = f"cache:deleted:{date_str}"
+        entry = f"{file_id}|{now.isoformat()}"
+        self.r.rpush(date_key, entry)
+        print(f"[LOG] Deleted cache entry for {file_id} → {date_key} / {entry}")
+
+    def delete_all_summaries(self) -> int:
+        deleted_count = 0
+        for key in self.r.scan_iter(match="pdf:summaries:*"):
+            file_ids = self.r.hkeys(key)
+            for fid in file_ids:
+                self._log_cache_deletion(fid)
+            
+            deleted_count += self.r.hlen(key)
+            self.r.delete(key)
+
+        for key in self.r.scan_iter(match="pdf:metadata:*"):
+            self.r.delete(key)
+            
+        return deleted_count
 
 @lru_cache(maxsize=1)
 def get_cache_db() -> "RedisCacheDB":
