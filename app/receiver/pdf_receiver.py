@@ -58,4 +58,3 @@ class PDFParser:
             return pytesseract.image_to_string(bw, lang=self.ocr_lang, timeout=10)
         except Exception:
             return ""
-

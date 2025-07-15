@@ -8,7 +8,4 @@ env/
 .idea/
 .env
 chroma_db/
-summary_cache.db
-
-!summary_api_full_guide.md
-!summary_api_full_guide.pdf
+summary_cache.d^^X

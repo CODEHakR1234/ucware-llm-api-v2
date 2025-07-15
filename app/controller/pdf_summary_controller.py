@@ -32,4 +32,3 @@ async def summarize_pdf(
         raise HTTPException(status_code=400, detail=str(e))
 
     return result  # {file_id, summary, cached} 형식
-

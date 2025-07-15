@@ -1,6 +1,6 @@
-# 🧠 ucware-llm-api-v2
+# 🧠 ucware-llm-api-v1
 
-`ucware-llm-api-v2`는 PDF 문서와 채팅 대화의 요약 기능을 제공하는 FastAPI 기반 멀티 요약 API입니다.
+`ucware-llm-api-v1`는 PDF 문서와 채팅 대화의 요약 기능을 제공하는 FastAPI 기반 멀티 요약 API입니다.
 LangChain 0.2+ 구조를 따르며, OpenAI GPT, Chroma 벡터 DB, Redis 캐시를 통합해 대규모 문서도 빠르고 정확하게 요약할 수 있습니다.
 
 ---
@@ -21,8 +21,8 @@ LangChain 0.2+ 구조를 따르며, OpenAI GPT, Chroma 벡터 DB, Redis 캐시�
 ### ✅ 0. 프로젝트 클론 및 실행 권한 부여
 
 ```bash
-git clone https://github.com/CODEHakR1234/ucware-llm-api-v2.git
-cd ucware-llm-api-v2
+git clone https://github.com/CODEHakR1234/ucware-llm-api-v1.git
+cd ucware-llm-api-v1
 chmod +x scripts/*.sh
 chmod +x run_all.sh
 chmod +x setup_env.sh
@@ -48,7 +48,7 @@ KT Cloud 인스턴스에서 Hugging Face 기반 LLM을 `vLLM` 서버로 구동�
 - **모델 이름 직접 입력 가능**, 기본값은 `google/gemma-7b-it`
 - **Hugging Face 토큰**은 실행 시 안전하게 입력받음 (입력값 숨김 처리)
 - 실행된 서버는 **포트 12000**에서 대기하며, 로그는 `vllm.log`에 저장됨
-- **모델 로딩 완료까지 자동 대기** (최대 300초까지 포트 오픈 감지)
+- **모델 로딩 완료까지 자동 대기** (최대 180초까지 포트 오픈 감지)
 
 ---
 
