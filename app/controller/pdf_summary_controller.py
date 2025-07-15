@@ -25,6 +25,7 @@ async def summarize_pdf(
             file_id=req.file_id,
             pdf_url=str(req.pdf_url),
             query=req.query,
+            lang=req.lang,
         )
     except ValueError as e:
         # Service 층에서 검증 실패 시 400 에러로 매핑

@@ -28,6 +28,7 @@ class SummaryState(BaseModel):
     file_id: str
     url: str
     query: str
+    lang: str
 
     chunks: Optional[List[TextChunk]] = None
     retrieved: Optional[List[TextChunk]] = None
