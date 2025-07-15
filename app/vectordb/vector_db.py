@@ -56,6 +56,7 @@ class VectorDB:
             client=self.client,
             collection_name=collection_name,
             embedding_function=self.embeddings,
+            persist_directory="./chroma_db" 
         )
 
     def store(self, text: str, file_id: str) -> None:
@@ -179,7 +180,7 @@ class VectorDB:
 
     def get_memory_estimate(self) -> dict:
         try:
-            base_path = os.getenv("CHROMA_DB_IMPL", "/chroma")  # 실제 경로로 변경
+            base_path = "./chroma_db" # 실제 경로로 변경
             size_bytes = self._get_directory_size(base_path)
             return {
                 "base_path": base_path,

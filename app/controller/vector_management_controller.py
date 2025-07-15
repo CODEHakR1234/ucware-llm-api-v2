@@ -10,9 +10,11 @@ router = APIRouter(prefix="/vector", tags=["vector-management"])
 async def vector_statistics(vdb: VectorDB = Depends(get_vector_db)):
     try:
         file_ids = vdb.list_stored_documents()
+        disk_info = vdb.get_memory_estimate()
         return {
             "count": len(file_ids),
-            "file_ids": file_ids
+            "file_ids": file_ids,
+            "disk_estimate": disk_info
         }
     except Exception as e:
         return {"error": f"VectorDB 조회 중 오류: {e}"}
