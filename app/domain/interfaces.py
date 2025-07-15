@@ -20,6 +20,9 @@ class VectorStoreIF(Protocol):
     @abstractmethod
     async def get_all(self, doc_id: str) -> List[TextChunk]: ... #문서 전체 갖고오기
 
+    @abstractmethod
+    async def has_chunks(self, doc_id: str) -> bool: ...
+
 class LlmChainIF(Protocol):
     @abstractmethod
     async def execute(self, prompt: str) -> str: ...

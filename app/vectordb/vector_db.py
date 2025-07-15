@@ -3,6 +3,7 @@ import os
 import threading
 from functools import lru_cache
 from typing import List
+from operator import itemgetter
 
 import chromadb
 from chromadb.config import Settings
@@ -83,24 +84,27 @@ class VectorDB:
         except Exception as e:
             print(f"Error retrieving documents: {e}")
             return []
-
+        
     def get_all_chunks(self, file_id: str) -> List[Document]:
-        """Return *all* stored chunks for *file_id* as ``Document`` objects."""
+        """모든 청크를 chunk_index 기준으로 정렬해 반환."""
         try:
-            collection_name = self._get_collection_name(file_id)
-            collection = self.client.get_collection(collection_name)
-            data = collection.get()  # returns dict with documents & metadatas
+            col = self.client.get_collection(self._get_collection_name(file_id))
+            data = col.get(include=["documents", "metadatas"])
 
-            docs: list[str] = data.get("documents", [])  # raw strings
-            metas: list[dict] = data.get("metadatas", [{}] * len(docs))
+            docs_raw: list[str]      = data.get("documents", [])
+            metas_raw: list[dict]    = data.get("metadatas", [{}] * len(docs_raw))
 
-            return [
-                Document(page_content=text, metadata=meta)
-                for text, meta in zip(docs, metas)
-            ]
+            # (doc, meta) 튜플을 chunk_index 로 정렬
+            items = sorted(
+                zip(docs_raw, metas_raw),
+                key=lambda x: x[1].get("chunk_index", 0)
+            )
+            return [Document(page_content=t, metadata=m) for t, m in items]
+
         except Exception as e:
-            print(f"Error fetching all chunks: {e}")
+            print(f"[VectorDB.get_all_chunks] {e}")
             return []
+
 
     def has_chunks(self, file_id: str) -> bool:
         """Quick boolean check: does *file_id* have at least one chunk stored?"""
