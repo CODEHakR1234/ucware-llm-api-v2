@@ -18,6 +18,9 @@ echo "1. openai"
 echo "2. hf (HuggingFace)"
 read -p "선택 [1/2]: " PROVIDER_CHOICE
 
+echo "🔑 Tavily API Key를 입력하세요: "
+read -r TAVILY_API_KEY
+
 if [ "$PROVIDER_CHOICE" == "2" ]; then
     LLM_PROVIDER="hf"
     EMBEDDING_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
@@ -44,6 +47,7 @@ LLM_PROVIDER=$LLM_PROVIDER
 EMBEDDING_MODEL_NAME=$EMBEDDING_MODEL_NAME
 LLM_MODEL_NAME=$LLM_MODEL_NAME
 OPENAI_API_KEY="$OPENAI_API_KEY"
+TAVILY_API_KEY="$TAVILY_API_KEY"
 EOF
 
 echo "[✔] .env 생성 완료"

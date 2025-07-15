@@ -18,6 +18,7 @@ from app.domain.interfaces import (
     LlmChainIF,
     PdfLoaderIF,
     TextChunk,
+    WebSearchIF,
     VectorStoreIF,
 )
 
@@ -33,11 +34,17 @@ class SummaryState(BaseModel):
     retrieved: Optional[List[TextChunk]] = None
     summary: Optional[str] = None
     answer:  Optional[str] = None
+    
+    log : Optional[List[str]] = [] # 임시 테스트용 로그
 
     cached: bool = False
     embedded: bool = False
     is_summary: bool = False
     error: Optional[str] = None
+    lang: Optional[str] = "KO"
+    
+    is_web: Optional[bool] = None
+    is_good: Optional[bool] = None
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +61,7 @@ def safe_retry(fn: Callable[[SummaryState], Awaitable[SummaryState]]):
     async def _wrap(st: SummaryState):  # type: ignore[override]
         for attempt in range(1, _RETRY + 1):
             try:
+                st.log.append(f"{fn.__name__} attempt {attempt}")
                 return await fn(st)
             except Exception as exc:  # noqa: BLE001
                 if attempt == _RETRY:
@@ -73,10 +81,11 @@ class SummaryGraphBuilder:
         self,
         loader: PdfLoaderIF,
         store: VectorStoreIF,
+        web_search: WebSearchIF,
         llm: LlmChainIF,
         cache: CacheIF,
     ):
-        self.loader, self.store, self.llm, self.cache = loader, store, llm, cache
+        self.loader, self.store, self.web_search, self.llm, self.cache = loader, store, web_search, llm, cache
 
     # ------------------------------------------------------------------
     def build(self):
@@ -97,8 +106,8 @@ class SummaryGraphBuilder:
             if st.is_summary:
                 if st.cached:
                     return "translate"
-                return "retrieve" if st.embedded else "load"
-            return "retrieve" if st.embedded else "load"
+                return "RAG_router" if st.embedded else "load"
+            return "RAG_router" if st.embedded else "load"
 
         g.add_node("entry", entry_router)
 
@@ -134,25 +143,209 @@ class SummaryGraphBuilder:
 
         # 3-Q. Retrieve -------------------------------------------------
         @safe_retry
-        async def retrieve(st: SummaryState):
-            st.retrieved = await self.store.similarity_search(st.file_id, st.query)
+        async def RAG_router(st: SummaryState):
+            if st.cached:
+                st.summary = self.cache.get_summary(st.file_id)
+            else:
+                st.chunks = await self.store.get_all(st.file_id)
+                st.summary = await self.llm.summarize(st.chunks)
+                
+            prompt = """
+                You are a helpful assistant that can determine if the answer of the query need extra information from the web.
+                If the answer need extra information from the web, return 'true'.
+                If the answer does not need extra information from the web, return 'false'.
+                Query: {query}
+                Summary: {summary}
+                """
+            prompt = prompt.format(query=st.query, summary=st.summary)
+            result = await self.llm.execute(prompt)
+            
+            st.is_web = "true" in result.lower()
+            
             return st
-
-        g.add_node("retrieve", retrieve)
-
-        # 4-Q. Answer ---------------------------------------------------
+        
+        g.add_node("RAG_router", RAG_router)
+        
+        def post_RAG_router(st: SummaryState) -> str:
+            if st.error:
+                return "finish"
+            if st.is_summary:
+                return "summarize"
+            return "retrieve_web" if st.is_web else "retrieve_vector"
+    
+    
+        g.add_conditional_edges("RAG_router", post_RAG_router, {
+            "retrieve_web":  "retrieve_web",
+            "retrieve_vector":  "retrieve_vector",
+            "summarize":    "summarize",
+            "finish":    "finish",
+        })
+        
         @safe_retry
-        async def answer(st: SummaryState):
-            joined = "\n\n".join(st.retrieved or [])
-            prompt = (
-                "다음 글 조각들을 참고하여 **질문에 한국어로 답하세요**.\n"
-                f"### 질문: {st.query}\n### 글\n{joined}\n### 답변:"
-            )
+        async def retrieve_web(st: SummaryState):
+            search_task = self.web_search.search(st.query, k=5)
+            vector_task = self.store.similarity_search(st.file_id, st.query, k=3)
+            search_result, vector_result = await asyncio.gather(search_task, vector_task)
+            st.retrieved = vector_result + search_result
+            
+            return st
+        
+        g.add_node("retrieve_web", retrieve_web)
+        
+        @safe_retry
+        async def retrieve_vector(st: SummaryState):
+            st.retrieved = await self.store.similarity_search(st.file_id, st.query, k=8)
+            return st
+        
+        g.add_node("retrieve_vector", retrieve_vector)
+        
+        g.add_edge("retrieve_web", "grade")
+        g.add_edge("retrieve_vector", "grade")
+        
+        @safe_retry
+        async def grade(st: SummaryState):
+            # 요약된 본문, Retrieved된 결과를 보고 문맥상 필요한지 확인
+            # 필요하다면 추가적인 정보를 찾아야 한다면 'true'를 반환
+            # 필요하지 않다면 'false'를 반환
+            
+            good_chunks = []
+            for chunk in st.retrieved:
+                prompt = """
+                You are a helpful assistant that can grade the retrieved information.
+                If the retrieved information is good, return 'good'.
+                If the retrieved information is bad, return 'bad'.
+                Query: {query}
+                Summary: {summary}
+                Retrieved: {retrieved}
+                """
+                prompt = prompt.format(query=st.query, summary=st.summary, retrieved=chunk)
+                result = await self.llm.execute(prompt)
+                if "good" in result.lower():
+                    good_chunks.append(chunk)
+            
+            st.retrieved = good_chunks
+            return st
+        
+        g.add_node("grade", grade)
+        
+        def post_grade(st: SummaryState) -> str:
+            if st.error:
+                return "finish"
+            else:
+                return "generate"
+        
+        g.add_conditional_edges("grade", post_grade, {
+            "generate": "generate",
+            "finish": "finish",
+        })
+        
+        @safe_retry
+        async def generate(st: SummaryState):
+            prompt = """
+            You are a helpful assistant that can generate a answer of the query.
+            Query: {query}
+            Retrieved: {retrieved}
+            """
+            prompt = prompt.format(query=st.query, retrieved=st.retrieved)
             st.answer = await self.llm.execute(prompt)
             return st
+        
+        g.add_node("generate", generate)
+        
+        def post_generate(st: SummaryState) -> str:
+            return "finish" if st.error else "verify"
+        
+        g.add_conditional_edges("generate", post_generate, {
+            "verify": "verify",
+            "finish": "finish",
+        })
+        
+        @safe_retry
+        async def verify(st: SummaryState):
+            # 생성된 답변을 검증하여 다음 내용들을 판별:
+            # 1. 생성된 답변이 쿼리에 대한 적절한 답변인가?
+            # 2. 생성된 답변이 retrieved 정보를 바탕으로 한 것인가?
+            # 3. 생성된 답변이 논리적으로 일관성이 있는가?
+            # 4. 생성된 답변이 완전하고 구체적인가?
+            
+            prompt = """
+            You are a helpful assistant that can verify the quality of the generated answer.
+            Please evaluate the answer based on the following criteria:
+            1. Does the answer directly address the query?
+            2. Is the answer based on the retrieved information?
+            3. Is the answer logically consistent?
+            4. Is the answer complete and specific?
+            
+            Query: {query}
+            Summary: {summary}
+            Retrieved Information: {retrieved}
+            Generated Answer: {answer}
+            
+            Return 'good' if the answer meets all criteria, otherwise return 'bad'. Do not return anything else.
+            """
+            prompt = prompt.format(query=st.query, summary=st.summary, retrieved=st.retrieved, answer=st.answer)
+            result = await self.llm.execute(prompt)
+            st.is_good = "good" in result.lower()
+            return st
+        
+        g.add_node("verify", verify)
+        
+        def post_verify(st: SummaryState) -> str:
+            if st.error:
+                return "finish"
+            if not st.is_good:
+                return "refine"
+            return "save" if st.is_summary else "translate"
+        
+        g.add_conditional_edges("verify", post_verify, {
+            "save": "save",
+            "refine": "refine",
+            "finish": "finish",
+            "translate": "translate",
+        })
+        
+        @safe_retry
+        async def refine(st: SummaryState):
+            prompt = """
+            You are a helpful assistant that can do two things:
+            1. If the query is not related to the document content, return ONLY this sentence: "I'm sorry, but your question is not related to the document content. Please ask a question about the document's content."
+            2. If the query is related, refine the query to get more relevant and accurate information based on the document summary and retrieved information. Return ONLY the refined query, nothing else.
 
-        g.add_node("answer", answer)
-
+            Document Summary: {summary}
+            Original Query: {query}
+            Retrieved Information: {retrieved}
+            Generated Answer: {answer}
+            """
+            prompt = prompt.format(
+                summary=st.summary,
+                query=st.query,
+                retrieved=st.retrieved,
+                answer=st.answer
+            )
+            result = await self.llm.execute(prompt)
+            # 관련 없는 경우
+            if "not related to the document content" in result:
+                st.answer = result
+                return st
+            # 관련 있는 경우(리파인된 쿼리 반환)
+            st.query = result
+            return st
+        
+        g.add_node("refine", refine)
+        
+        def post_refine(st: SummaryState) -> str:
+            if st.error:
+                return "finish"
+            if "not related to the document content" in st.answer:
+                return "translate"
+            else:
+                return "RAG_router"
+        g.add_conditional_edges("refine", post_refine, {
+            "RAG_router": "RAG_router",
+            "translate": "translate",
+            "finish": "finish",
+        })
+        
         # 5. Save summary ----------------------------------------------
         async def save_summary(st: SummaryState):
             if st.is_summary and not st.cached and st.summary:
@@ -161,8 +354,23 @@ class SummaryGraphBuilder:
 
         g.add_node("save", save_summary)
 
+        @safe_retry
+        async def translate(st: SummaryState):
+            if st.is_summary:
+                st.answer = self.cache.get_summary(st.file_id)
+            
+            prompt = """
+            You are a helpful assistant that can translate the answer to User language.
+            User language: {lang}
+            Answer: {answer}
+            """
+            prompt = prompt.format(lang=st.lang, answer=st.answer)
+            st.answer = await self.llm.execute(prompt)
+            return st
+
+
         # 6. Translate & finish ----------------------------------------
-        g.add_node("translate", lambda st: st)
+        g.add_node("translate", translate)
         g.add_node("finish",    lambda st: st)
 
         # Routing -------------------------------------------------------
@@ -170,7 +378,7 @@ class SummaryGraphBuilder:
 
         g.add_conditional_edges("entry", entry_branch, {
             "translate": "translate",
-            "retrieve":  "retrieve",
+            "RAG_router":  "RAG_router",
             "load":      "load",
             "finish":    "finish",
         })
@@ -184,26 +392,15 @@ class SummaryGraphBuilder:
         })
 
         def post_embed(st: SummaryState) -> str:
-            return "finish" if st.error else ("summarize" if st.is_summary else "retrieve")
+            return "finish" if st.error else "RAG_router"
 
         g.add_conditional_edges("embed", post_embed, {
-            "summarize": "summarize",
-            "retrieve":  "retrieve",
+            "RAG_router":  "RAG_router",
             "finish":    "finish",
         })
 
-        def post_retrieve(st: SummaryState) -> str:
-            return "finish" if st.error else ("summarize" if st.is_summary else "answer")
-
-        g.add_conditional_edges("retrieve", post_retrieve, {
-            "summarize": "summarize",
-            "answer":    "answer",
-            "finish":    "finish",
-        })
-
-        g.add_edge("answer",     "finish")
         g.add_edge("summarize",  "save")
-        g.add_edge("save",       "finish")
+        g.add_edge("save",       "translate")
         g.add_edge("translate",  "finish")
 
         g.set_finish_point("finish")

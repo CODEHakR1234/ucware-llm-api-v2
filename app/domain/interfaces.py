@@ -9,6 +9,9 @@ class PdfLoaderIF(Protocol):
     @abstractmethod
     async def load(self, url: str) -> List[TextChunk]: ...
 
+class WebSearchIF(Protocol):
+    @abstractmethod
+    async def search(self, query: str) -> List[TextChunk]: ...
 
 class VectorStoreIF(Protocol):
     @abstractmethod
