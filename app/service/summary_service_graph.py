@@ -3,6 +3,7 @@ from app.infra.pdf_loader import PdfLoader
 from app.infra.vector_store import VectorStore
 from app.infra.llm_engine import LlmEngine
 from app.infra.cache_store import CacheStore          
+from app.infra.web_search import WebSearch
 from app.domain.interfaces import CacheIF
 from .summary_graph_builder import SummaryGraphBuilder, SummaryState
 
@@ -12,6 +13,7 @@ from .summary_graph_builder import SummaryGraphBuilder, SummaryState
 _builder_singleton = SummaryGraphBuilder(
     PdfLoader(),
     VectorStore(),
+    WebSearch(),
     LlmEngine(),
     CacheStore(),
 )
@@ -36,6 +38,7 @@ class SummaryServiceGraph:
         body = {
             "file_id": file_id,
             "cached": result.get("cached", False),
+            "log" : result.get("log"),
         }
         if result.get("error"):
             body["error"] = result["error"]
@@ -43,10 +46,10 @@ class SummaryServiceGraph:
 
         # `is_summary` is set by the EntryRouter in the graph
         if result.get("is_summary"):
-            body["summary"] = result.get("summary")
+            body["summary"] = result.get("answer")
         else:
             body["answer"] = result.get("answer")
-
+        
         return body
 
 

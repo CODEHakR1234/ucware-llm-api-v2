@@ -30,3 +30,6 @@ openai
 redis>=5.0.0
 
 httpx[http2]  # httpx 비동기 클라이언트
+
+# ───────── Tavily Search API ─────────
+tavily-python
