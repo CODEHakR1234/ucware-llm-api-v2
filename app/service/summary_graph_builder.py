@@ -42,7 +42,6 @@ class SummaryState(BaseModel):
     embedded: bool = False
     is_summary: bool = False
     error: Optional[str] = None
-    lang: Optional[str] = "KO"
     
     is_web: Optional[bool] = None
     is_good: Optional[bool] = None
